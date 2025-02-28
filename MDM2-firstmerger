@@ -20,7 +20,7 @@ restitution = 0.9  # Energy loss factor (1 = perfect bounce, <1 = energy loss)
 # 初始条件
 x1_0, y1_0 = 0.0, 1.0  # 上方小球初始位置
 x2_0, y2_0 = 0.0, 0.5  # 下方小球初始位置（竖直对齐）
-L0 = y1_0 - y2_0  # 弹簧的自然长度，确保初始无拉伸
+#L0 = y1_0 - y2_0  # 弹簧的自然长度，确保初始无拉伸
 
 v1x_0, v1y_0 = 0.3, 0.0  # 调整上方小球的 x 方向初速度，防止过度偏移
 v2x_0, v2y_0 = 0.3, 0.0  # 使两个小球的初始运动更对称
@@ -48,11 +48,12 @@ def equations(t, y):
     F_spring_x = F_spring * ux
     F_spring_y = F_spring * uy
 
-    # 计算阻尼力（基于相对速度）
-    dvx = v1x - v2x
-    dvy = v1y - v2y
-    F_damping_x = -c * dvx
-    F_damping_y = -c * dvy
+    # finding the component of velocity in spring
+    velocity_component = (v1x)*ux + (v1y)*uy
+
+    # Compute damping forces
+    F_damping_x = -c * velocity_component * ux
+    F_damping_y = -c * velocity_component * uy
 
     # 计算安全带力的 x, y 分量（指向左下角）
     F_s1x = F_s1 * np.cos(theta1)
