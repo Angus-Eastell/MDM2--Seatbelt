@@ -3,10 +3,10 @@ import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 from scipy.integrate import solve_ivp
 
-m1 = 5.0  # 上方小球质量
-m2 = 7.0  # 下方小球质量
+m1 = 30.0  # 上方小球质量
+m2 = 45.0  # 下方小球质量
 k = 20.0  # 弹簧常数
-c = 2.0  # 阻尼系数
+c = 1000.0  # 阻尼系数
 F_s1 = 50.0  # 上方小球的安全带力
 F_s2 = 50.0  # 下方小球的安全带力
 g = 9.81  # 重力加速度
