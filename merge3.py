@@ -194,10 +194,16 @@ def floor_collision_m1(t, Y):
 def floor_collision_m2(t, Y):
     return Y[6] - y_floor  # Detect when abdomen (y2) hits the floor
 
+def floor_collision_m3(t, Y):
+    return Y[8] - y_floor  # Detect when head (y3) hits the floor
+
+
 floor_collision_m1.terminal = True
 floor_collision_m1.direction = -1
 floor_collision_m2.terminal = True
 floor_collision_m2.direction = -1
+floor_collision_m3.terminal = True
+floor_collision_m3.direction = -1
 
 def solve_with_bounces(t_max, init_conditions):
     t_all = []
@@ -208,7 +214,7 @@ def solve_with_bounces(t_max, init_conditions):
         t_span = (t0, t_max)
         sol = solve_ivp(equations, t_span, conditions,
                         t_eval=np.linspace(t0, t_max, 1000),
-                        events=[floor_collision_m1, floor_collision_m2])
+                        events=[floor_collision_m1, floor_collision_m2, floor_collision_m3])
         t_all.append(sol.t)
         sol_all.append(sol.y)
         Y_collision = sol.y[:, -1]
@@ -217,6 +223,8 @@ def solve_with_bounces(t_max, init_conditions):
             Y_collision[3] *= -restitution
         if len(sol.t_events[1]) > 0:
             Y_collision[7] *= -restitution
+        if len(sol.t_events[1]) > 0:
+            Y_collision[11] *= -restitution
         t0 = sol.t[-1] + 1e-3
         conditions = Y_collision
     t_full = np.concatenate(t_all)
@@ -229,11 +237,25 @@ x1, y1 = sol[0], sol[2]
 x2, y2 = sol[4], sol[6]
 x3, y3 = sol[8], sol[10]
 
+# =============== position plot======================
+
+plt.figure(figsize=(8, 5))
+plt.plot(x1, y1, 'b-', label='Chest (m1)')
+plt.plot(x2, y2, 'r-', label='Abdomen (m2)')
+plt.plot(x3, y3, 'g', label = 'Head')
+plt.xlabel('X Position (m)')
+plt.ylabel('Y Position (m)')
+plt.title('Initial Trajectory (No Bounces)')
+plt.grid()
+plt.legend()
+plt.show()
+
+
 # =============== 5. Animation Display ===============
-x_min = min(x1.min(), x2.min())
-x_max = max(x1.max(), x2.max())
-y_min = min(y1.min(), y2.min())
-y_max = max(y1.max(), y2.max())
+x_min = min(x1.min(), x2.min(), x3.min())
+x_max = max(x1.max(), x2.max(), x3.max())
+y_min = min(y1.min(), y2.min(), y3.min())
+y_max = max(y1.max(), y2.max(), y3.max())
 padding = 0.1 * (x_max - x_min)
 x_min -= padding
 x_max += padding
