@@ -10,19 +10,19 @@ def sigmoid(x, k, x0):
     return 1 / (1 + np.exp(-k * (x - x0)))
 
 # Physical parameters
-m1 = 17.52       # Mass of the upper ball (chest)
-m2 = 30.0       # Mass of the lower ball (abdomen)
-k = 18.0        # Spring constant (connecting chest and abdomen)
-c = 45.0        # Spring damping coefficient (using original formulation)
+m1 = 30.0       # Mass of the upper ball (chest)
+m2 = 45.0       # Mass of the lower ball (abdomen)
+k = 20.0        # Spring constant (connecting chest and abdomen)
+c = 40.0        # Spring damping coefficient (using original formulation)
 g = 9.81        # Gravitational acceleration
 L0 = 0.5        # Natural spring length
 y_floor = 0.0   # Floor height
 restitution = 0.9  # Energy loss factor upon collision (1 = perfect bounce, <1 = energy loss)
 # Adding parameters for the head mass
-m3 = 4.5  # Mass of the head
+m3 = 5.0  # Mass of the head
 L1 = 0.3  # Natural length of spring between head and chest
-k1 = 12.0  # Spring constant between head and chest
-c1 = 35.0  # Damping coefficient between head and chest
+k1 = 15.0  # Spring constant between head and chest
+c1 = 30.0  # Damping coefficient between head and chest
 
 
 # Seatbelt parameters (for nonlinear seatbelt force model)
@@ -37,7 +37,7 @@ x_anchor1, y_anchor1 = 0.01, 1.1  # Anchor for chest belt
 x_anchor2, y_anchor2 = 0.01, 0.1   # Anchor for abdomen belt
 
 # Impact (impulse) parameters (Gaussian pulse)
-A = 850.0         # Peak impulse force
+A = 800.0         # Peak impulse force
 b = 500.0         # Width control for Gaussian pulse
 t_impulse = 0.1   # Time at which impulse is centered (sec)
 ratio_impulse = 0.3  # Ratio of impulse force's y-component to x-component
