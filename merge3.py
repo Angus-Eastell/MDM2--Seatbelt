@@ -303,39 +303,68 @@ distance = np.sqrt((x1 - x2)**2 + (y1 - y2)**2)
 extension = distance - L0
 spring_force = k * extension
 
+distance1 = np.sqrt((x2 - x3)**2 + (y2 - y3)**2)
+extension1 = distance1 - L1
+spring_force1 = k1 * extension1
+
 plt.figure(figsize=(12, 5))
-plt.subplot(1, 2, 1)
-plt.plot(t, extension, 'r', label="Extension")
+plt.subplot(2, 2, 1)
+plt.plot(t, extension, 'r', label="Extension In Torso")
 plt.axhline(0, color='k', linestyle='--')
 plt.xlabel('Time (s)')
 plt.ylabel('Extension (m)')
-plt.title('Spring Extension Over Time')
+plt.title('Spring Extension In Torso Over Time')
 plt.legend()
 plt.grid()
 
-plt.subplot(1, 2, 2)
-plt.plot(t, spring_force, 'r', label="Force")
+plt.subplot(2, 2, 2)
+plt.plot(t, spring_force, 'r', label="Force In Torso")
 plt.axhline(0, color='k', linestyle='--')
 plt.xlabel('Time (s)')
 plt.ylabel('Force (N)')
-plt.title('Spring Force Over Time')
+plt.title('Spring Force In Torso Over Time')
+plt.legend()
+plt.grid()
+
+plt.subplot(2, 2, 3)
+plt.plot(t, extension1, 'r', label="Extension In Neck")
+plt.axhline(0, color='k', linestyle='--')
+plt.xlabel('Time (s)')
+plt.ylabel('Extension (m)')
+plt.title('Spring Extension In Neck Over Time')
+plt.legend()
+plt.grid()
+
+plt.subplot(2, 2, 4)
+plt.plot(t, spring_force1, 'r', label="Force In Neck")
+plt.axhline(0, color='k', linestyle='--')
+plt.xlabel('Time (s)')
+plt.ylabel('Force (N)')
+plt.title('Spring Force In Neck Over Time')
 plt.legend()
 plt.grid()
 plt.tight_layout()
 plt.show()
 
+
+
+
 x1, y1 = sol[0], sol[2]
 v1x, v1y = sol[1], sol[3]
 x2, y2 = sol[4], sol[6]
 v2x, v2y = sol[5], sol[7]
+x3, y3 = sol[8], sol[10]
+v3x, v3y = sol[9], sol[11]
 
 dv1x_dt = np.gradient(v1x, t)
 dv1y_dt = np.gradient(v1y, t)
 dv2x_dt = np.gradient(v2x, t)
 dv2y_dt = np.gradient(v2y, t)
+dv3x_dt = np.gradient(v3x, t)
+dv3y_dt = np.gradient(v3y, t)
 
 plt.figure(figsize=(10, 6))
-plt.subplot(2, 2, 1)
+plt.subplot(2, 3, 1)
 plt.plot(t, v1x, label='v1x')
 plt.plot(t, v1y, label='v1y')
 plt.xlabel('Time (s)')
@@ -344,7 +373,7 @@ plt.title('Chest Velocity Over Time')
 plt.legend()
 plt.grid()
 
-plt.subplot(2, 2, 2)
+plt.subplot(2, 3, 4)
 plt.plot(t, dv1x_dt, label='a1x')
 plt.plot(t, dv1y_dt, label='a1y')
 plt.xlabel('Time (s)')
@@ -353,7 +382,7 @@ plt.title('Chest Acceleration Over Time')
 plt.legend()
 plt.grid()
 
-plt.subplot(2, 2, 3)
+plt.subplot(2, 3, 2)
 plt.plot(t, v2x, label='v2x')
 plt.plot(t, v2y, label='v2y')
 plt.xlabel('Time (s)')
@@ -362,12 +391,30 @@ plt.title('Abdomen Velocity Over Time')
 plt.legend()
 plt.grid()
 
-plt.subplot(2, 2, 4)
+plt.subplot(2, 3, 5)
 plt.plot(t, dv2x_dt, label='a2x')
 plt.plot(t, dv2y_dt, label='a2y')
 plt.xlabel('Time (s)')
 plt.ylabel('Acceleration (m/s²)')
 plt.title('Abdomen Acceleration Over Time')
+plt.legend()
+plt.grid()
+
+plt.subplot(2, 3, 3)
+plt.plot(t, v3x, label='v2x')
+plt.plot(t, v3y, label='v2y')
+plt.xlabel('Time (s)')
+plt.ylabel('Velocity (m/s)')
+plt.title('Head Velocity Over Time')
+plt.legend()
+plt.grid()
+
+plt.subplot(2, 3, 6)
+plt.plot(t, dv3x_dt, label='a2x')
+plt.plot(t, dv3y_dt, label='a2y')
+plt.xlabel('Time (s)')
+plt.ylabel('Acceleration (m/s²)')
+plt.title('Head Acceleration Over Time')
 plt.legend()
 plt.grid()
 
