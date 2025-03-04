@@ -9,28 +9,29 @@ def sigmoid(x, k, x0):
     """Sigmoid function used for smooth transition of seatbelt force with displacement"""
     return 1 / (1 + np.exp(-k * (x - x0)))
 
+
 # Physical parameters
-m1 = 30.0       # Mass of the upper ball (chest)
-m2 = 45.0       # Mass of the lower ball (abdomen)
-k = 20.0        # Spring constant (connecting chest and abdomen)
-c = 40.0        # Spring damping coefficient (using original formulation)
+m1 = 19.5       # Mass of the upper ball (chest)
+m2 = 21.7       # Mass of the lower ball (abdomen)
+k = 650.0        # Spring constant (connecting chest and abdomen)
+c = 500.0        # Spring damping coefficient (using original formulation)
 g = 9.81        # Gravitational acceleration
 L0 = 0.5        # Natural spring length
 y_floor = 0.0   # Floor height
 restitution = 0.9  # Energy loss factor upon collision (1 = perfect bounce, <1 = energy loss)
 # Adding parameters for the head mass
-m3 = 5.0  # Mass of the head
-L1 = 0.3  # Natural length of spring between head and chest
-k1 = 15.0  # Spring constant between head and chest
-c1 = 30.0  # Damping coefficient between head and chest
+m3 = 4.5  # Mass of the head
+L1 = 0.2  # Natural length of spring between head and chest
+k1 = 500.0  # Spring constant between head and chest
+c1 = 800.0  # Damping coefficient between head and chest
 
 
 # Seatbelt parameters (for nonlinear seatbelt force model)
-F_max = 1000.0    # Maximum seatbelt force
+F_max = 2000.0    # Maximum seatbelt force
 k_s = 50.0        # Sigmoid slope
 L_slack1 = 0.1    # Slack length for the chest seatbelt (no force when displacement is within slack)
 L_slack2 = 0.1    # Slack length for the abdomen seatbelt
-c_s = 10.0        # Seatbelt damping coefficient
+c_s = 1000.0        # Seatbelt damping coefficient
 
 # Seatbelt anchor points (fixed points); adjust to match desired seatbelt direction
 x_anchor1, y_anchor1 = 0.01, 1.1  # Anchor for chest belt
@@ -39,7 +40,7 @@ x_anchor2, y_anchor2 = 0.01, 0.1   # Anchor for abdomen belt
 # Impact (impulse) parameters (Gaussian pulse)
 A = 800.0         # Peak impulse force
 b = 500.0         # Width control for Gaussian pulse
-t_impulse = 0.1   # Time at which impulse is centered (sec)
+t_impulse = 0.04  # Time at which impulse is centered (sec)
 ratio_impulse = 0.3  # Ratio of impulse force's y-component to x-component
 
 # Initial conditions (position & velocity)
@@ -48,7 +49,7 @@ x2_0, y2_0 = 0.02, 0.5  # Initial position for abdomen
 v1x_0, v1y_0 = 0.0, 0.0  # Initial velocity for chest
 v2x_0, v2y_0 = 0.0, 0.0  # Initial velocity for abdomen
 # Initial conditions for head
-x3_0, y3_0 = 0.02, 1.3  # Position
+x3_0, y3_0 = 0.02, 1.2  # Position
 v3x_0, v3y_0 = 0.0, 0.0  # Velocity
 
 # =============== 2. Define the Differential Equations ===============
