@@ -9,6 +9,7 @@ def sigmoid(x, k, x0):
     """Sigmoid function used for smooth transition of seatbelt force with displacement"""
     return 1 / (1 + np.exp(-k * (x - x0)))
 
+
 # Physical parameters
 m1 = 20.0       # Mass of the upper ball (chest)
 m2 = 30.0       # Mass of the lower ball (abdomen)
@@ -39,7 +40,7 @@ x_anchor2, y_anchor2 = 0.01, 0.01   # Anchor for abdomen belt
 # Impact (impulse) parameters (Gaussian pulse)
 A = 800.0         # Peak impulse force
 b = 500.0         # Width control for Gaussian pulse
-t_impulse = 0.1   # Time at which impulse is centered (sec)
+t_impulse = 0.04  # Time at which impulse is centered (sec)
 ratio_impulse = 0.3  # Ratio of impulse force's y-component to x-component
 
 # Initial conditions (position & velocity)
@@ -48,7 +49,7 @@ x2_0, y2_0 = 0.02, 0.01  # Initial position for abdomen
 v1x_0, v1y_0 = 0.0, 0.0  # Initial velocity for chest
 v2x_0, v2y_0 = 0.0, 0.0  # Initial velocity for abdomen
 # Initial conditions for head
-x3_0, y3_0 = 0.02, 0.66  # Position
+x3_0, y3_0 = 0.02, 1.2  # Position
 v3x_0, v3y_0 = 0.0, 0.0  # Velocity
 
 # =============== 2. Define the Differential Equations ===============
