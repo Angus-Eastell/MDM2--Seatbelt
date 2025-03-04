@@ -10,31 +10,31 @@ def sigmoid(x, k, x0):
     return 1 / (1 + np.exp(-k * (x - x0)))
 
 # Physical parameters
-m1 = 30.0       # Mass of the upper ball (chest)
-m2 = 45.0       # Mass of the lower ball (abdomen)
-k = 20.0        # Spring constant (connecting chest and abdomen)
-c = 40.0        # Spring damping coefficient (using original formulation)
+m1 = 20.0       # Mass of the upper ball (chest)
+m2 = 30.0       # Mass of the lower ball (abdomen)
+k = 1500.0        # Spring constant (connecting chest and abdomen)
+c = 500.0        # Spring damping coefficient (using original formulation)
 g = 9.81        # Gravitational acceleration
 L0 = 0.5        # Natural spring length
 y_floor = 0.0   # Floor height
 restitution = 0.9  # Energy loss factor upon collision (1 = perfect bounce, <1 = energy loss)
 # Adding parameters for the head mass
 m3 = 5.0  # Mass of the head
-L1 = 0.3  # Natural length of spring between head and chest
-k1 = 15.0  # Spring constant between head and chest
-c1 = 30.0  # Damping coefficient between head and chest
+L1 = 0.15  # Natural length of spring between head and chest
+k1 = 10000.0  # Spring constant between head and chest
+c1 = 300.0  # Damping coefficient between head and chest
 
 
 # Seatbelt parameters (for nonlinear seatbelt force model)
 F_max = 1000.0    # Maximum seatbelt force
-k_s = 50.0        # Sigmoid slope
+k_s = 250.0        # Sigmoid slope
 L_slack1 = 0.1    # Slack length for the chest seatbelt (no force when displacement is within slack)
 L_slack2 = 0.1    # Slack length for the abdomen seatbelt
-c_s = 10.0        # Seatbelt damping coefficient
+c_s = 50.0        # Seatbelt damping coefficient
 
 # Seatbelt anchor points (fixed points); adjust to match desired seatbelt direction
-x_anchor1, y_anchor1 = 0.01, 1.1  # Anchor for chest belt
-x_anchor2, y_anchor2 = 0.01, 0.1   # Anchor for abdomen belt
+x_anchor1, y_anchor1 = 0.01, 0.51  # Anchor for chest belt
+x_anchor2, y_anchor2 = 0.01, 0.01   # Anchor for abdomen belt
 
 # Impact (impulse) parameters (Gaussian pulse)
 A = 800.0         # Peak impulse force
@@ -43,12 +43,12 @@ t_impulse = 0.1   # Time at which impulse is centered (sec)
 ratio_impulse = 0.3  # Ratio of impulse force's y-component to x-component
 
 # Initial conditions (position & velocity)
-x1_0, y1_0 = 0.02, 1.0  # Initial position for chest
-x2_0, y2_0 = 0.02, 0.5  # Initial position for abdomen
+x1_0, y1_0 = 0.02, 0.51  # Initial position for chest
+x2_0, y2_0 = 0.02, 0.01  # Initial position for abdomen
 v1x_0, v1y_0 = 0.0, 0.0  # Initial velocity for chest
 v2x_0, v2y_0 = 0.0, 0.0  # Initial velocity for abdomen
 # Initial conditions for head
-x3_0, y3_0 = 0.02, 1.3  # Position
+x3_0, y3_0 = 0.02, 0.66  # Position
 v3x_0, v3y_0 = 0.0, 0.0  # Velocity
 
 # =============== 2. Define the Differential Equations ===============
@@ -81,8 +81,8 @@ def equations(t, Y):
     v_rel = rel_vx*ux + rel_vy*uy
     F_damp_x = -c * v_rel * ux
     F_damp_y = -c * v_rel * uy
-    F_spring_x = F_spring * ux + F_damp_x
-    F_spring_y = F_spring * uy + F_damp_y
+    F_spring_x = F_spring * ux
+    F_spring_y = F_spring * uy
 
     # Spring & damping forces (Head-Chest)
     dxh = x3 - x1
@@ -98,8 +98,8 @@ def equations(t, Y):
     v_rel_h = rel_vxh * uxh + rel_vyh * uyh
     F_damp_xh = -c1 * v_rel_h * uxh
     F_damp_yh = -c1 * v_rel_h * uyh
-    F_spring_xh = F_spring_h * uxh + F_damp_xh
-    F_spring_yh = F_spring_h * uyh + F_damp_yh
+    F_spring_xh = F_spring_h * uxh
+    F_spring_yh = F_spring_h * uyh
 
     # ---------- B. Seatbelt Force: Chest Belt (Pull-only) ----------
     dx1_anchor = x1 - x_anchor1
@@ -153,12 +153,12 @@ def equations(t, Y):
     ratio_abdomen = ratio_impulse
 
     # ---------- E. Combine Forces -> Acceleration ----------
-    dv1x_dt = (F_spring_x + F_s1x + impulse_x) / m1
-    dv1y_dt = (F_spring_y + F_s1y - g + impulse_y) / m1
-    dv2x_dt = (-F_spring_x + F_s2x + ratio_abdomen * impulse_x) / m2
-    dv2y_dt = (-F_spring_y + F_s2y - g + ratio_abdomen * impulse_y) / m2
-    dv3x_dt = (F_spring_xh) / m3
-    dv3y_dt = (F_spring_yh - g) / m3
+    dv1x_dt = (F_spring_x - F_spring_xh + F_damp_x - F_damp_xh + F_s1x + impulse_x) / m1
+    dv1y_dt = (F_spring_y - F_spring_yh + F_damp_y - F_damp_yh + F_s1y + impulse_y) / m1 -g
+    dv2x_dt = (-F_spring_x - F_damp_x + F_s2x + ratio_abdomen * impulse_x) / m2
+    dv2y_dt = (-F_spring_y - F_damp_y + F_s2y + ratio_abdomen * impulse_y) / m2 -g
+    dv3x_dt = (F_spring_xh + F_damp_xh + impulse_x) / m3
+    dv3y_dt = (F_spring_yh + F_damp_yh + impulse_y) / m3 -g
     return [dx1_dt, dv1x_dt, dy1_dt, dv1y_dt,
             dx2_dt, dv2x_dt, dy2_dt, dv2y_dt,dx3_dt, dv3x_dt, dy3_dt, dv3y_dt]
 
@@ -184,7 +184,7 @@ plt.ylabel('Y Position (m)')
 plt.title('Initial Trajectory (No Bounces)')
 plt.grid()
 plt.legend()
-plt.show()
+plt.close()
 
 
 # =============== 4. Multi-phase Integration (With Floor Collisions) ===============
@@ -301,11 +301,11 @@ plt.show()
 # =============== 6. Other Plots: Spring Extension, Velocity, Acceleration ===============
 distance = np.sqrt((x1 - x2)**2 + (y1 - y2)**2)
 extension = distance - L0
-spring_force = k * extension
+spring_force = -k * extension
 
-distance1 = np.sqrt((x2 - x3)**2 + (y2 - y3)**2)
+distance1 = np.sqrt((x3 - x1)**2 + (y3 - y1)**2)
 extension1 = distance1 - L1
-spring_force1 = k1 * extension1
+spring_force1 = -k1 * extension1
 
 plt.figure(figsize=(12, 5))
 plt.subplot(2, 2, 1)
