@@ -15,7 +15,7 @@ x2_0, y2_0 = 0.02, 0.01  # Initial position for abdomen
 v1x_0, v1y_0 = 0.0, 0.0  # Initial velocity for chest
 v2x_0, v2y_0 = 0.0, 0.0  # Initial velocity for abdomen
 # Initial conditions for head
-x3_0, y3_0 = 0.02, 0.81  # Position
+x3_0, y3_0 = 0.02, 0.66  # Position
 v3x_0, v3y_0 = 0.0, 0.0  # Velocity
 
 # =============== 2. Define the Differential Equations ===============
@@ -125,8 +125,8 @@ def equations(t, Y, params):
     # ----------- Neck Force -------------------------------
     
     # finding ideal neck positon 
-    x_neck = -ux* L1 + x1
-    y_neck = -uy* L1 + y1
+    x_neck = ux* L1 + x1
+    y_neck = uy* L1 + y1
 
     dx_neck = x3 - x_neck
     dy_neck = y3 - y_neck
@@ -140,8 +140,8 @@ def equations(t, Y, params):
     rel_vx_neck = v1x - v2x
     rel_vy_neck = v1y - v2y
     v_rel_neck = rel_vx_neck*ux + rel_vy_neck*uy
-    F_damp_x_neck = -c * v_rel_neck * ux_neck
-    F_damp_y_neck = -c * v_rel_neck * uy_neck
+    F_damp_x_neck = -c1 * v_rel_neck * ux_neck
+    F_damp_y_neck = -c1 * v_rel_neck * uy_neck
 
     # ---------- D. Impact Force (Gaussian Pulse) ----------
     # Main impulse along x-direction
@@ -174,8 +174,8 @@ def equations(t, Y, params):
     dv1y_dt = (F_spring_y - F_spring_yh + F_damp_y - F_damp_yh + F_s1y + impulse_y + F_floor_1) / m1 -g
     dv2x_dt = (-F_spring_x - F_damp_x + F_s2x + ratio_abdomen * impulse_x) / m2
     dv2y_dt = (-F_spring_y - F_damp_y + F_s2y + ratio_abdomen * impulse_y + F_floor_2) / m2 -g
-    dv3x_dt = (F_spring_xh + F_damp_xh + F_spring_x_neck + impulse_x) / m3
-    dv3y_dt = (F_spring_yh + F_damp_yh + F_spring_y_neck + impulse_y + F_floor_3) / m3 -g
+    dv3x_dt = (F_spring_xh + F_damp_xh + F_spring_x_neck + F_damp_x_neck + impulse_x) / m3
+    dv3y_dt = (F_spring_yh + F_damp_yh + F_spring_y_neck + F_damp_y_neck + impulse_y + F_floor_3) / m3 -g
 
     return [dx1_dt, dv1x_dt, dy1_dt, dv1y_dt,
             dx2_dt, dv2x_dt, dy2_dt, dv2y_dt,dx3_dt, dv3x_dt, dy3_dt, dv3y_dt]
