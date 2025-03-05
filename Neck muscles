@@ -1,0 +1,17 @@
+# ---------- H. Active Support Force (Muscle) --------------
+    # Compute active support force for head (only vertical direction)
+    # F_active = k_active * (y_target - y3) - c_active * v3y
+    F_active = k_active * (y_target - y3) - c_active * v3y
+
+    # ---------- I. Combine Forces -> Acceleration ----------
+    dv1x_dt = (F_spring_x - F_spring_xh + F_damp_x - F_damp_xh + F_s1x + impulse_x) / m1
+    dv1y_dt = (F_spring_y - F_spring_yh + F_damp_y - F_damp_yh + F_s1y + impulse_y + F_floor_1) / m1 - g
+    dv2x_dt = (-F_spring_x - F_damp_x + F_s2x + ratio_impulse * impulse_x) / m2
+    dv2y_dt = (-F_spring_y - F_damp_y + F_s2y + ratio_impulse * impulse_y + F_floor_2) / m2 - g
+    dv3x_dt = (F_spring_xh + F_damp_xh + F_total_neck_x + impulse_x) / m3
+    # Add active support force F_active to head vertical acceleration
+    dv3y_dt = (F_spring_yh + F_damp_yh + F_total_neck_y + impulse_y + F_floor_3 + F_active) / m3 - g
+
+    return [dx1_dt, dv1x_dt, dy1_dt, dv1y_dt,
+            dx2_dt, dv2x_dt, dy2_dt, dv2y_dt,
+            dx3_dt, dv3x_dt, dy3_dt, dv3y_dt]
