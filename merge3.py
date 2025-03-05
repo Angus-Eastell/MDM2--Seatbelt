@@ -133,11 +133,15 @@ def equations(t, Y, params):
     dist_neck = np.sqrt(dx_neck**2 + dy_neck**2)
     if dist_neck == 0:
         dist_neck = 1e-9
-    F_spring_neck = -k1 * (dist_neck - L1)
+    F_spring_neck = -k1 * (dist_neck)
     ux_neck, uy_neck = dx_neck/dist_neck, dy_neck/dist_neck
     F_spring_x_neck = F_spring_neck * ux_neck
     F_spring_y_neck= F_spring_neck * uy_neck
-
+    rel_vx_neck = v1x - v2x
+    rel_vy_neck = v1y - v2y
+    v_rel_neck = rel_vx_neck*ux + rel_vy_neck*uy
+    F_damp_x_neck = -c * v_rel_neck * ux_neck
+    F_damp_y_neck = -c * v_rel_neck * uy_neck
 
     # ---------- D. Impact Force (Gaussian Pulse) ----------
     # Main impulse along x-direction
