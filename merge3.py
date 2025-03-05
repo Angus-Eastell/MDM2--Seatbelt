@@ -474,9 +474,9 @@ def mass_distributions(t_max_sim, initial_conditions, params):
 
 parameters = {
     # Physical parameters
-    "m1": 20.0,       # Mass of the upper ball (chest)
-    "m2": 30.0,       # Mass of the lower ball (abdomen)
-    "k": 1500.0,      # Spring constant (connecting chest and abdomen)
+    "m1": 19.5,       # Mass of the upper ball (chest)
+    "m2": 21.7,       # Mass of the lower ball (abdomen)
+    "k": 650.0,      # Spring constant (connecting chest and abdomen)
     "c": 500.0,       # Spring damping coefficient (using original formulation)
     "g": 9.81,        # Gravitational acceleration
     "L0": 0.5,        # Natural spring length
@@ -486,17 +486,17 @@ parameters = {
     "c_floor": 250,   # Floor damping coefficient
 
     # Adding parameters for the head mass
-    "m3": 5.0,        # Mass of the head
+    "m3": 4.5,        # Mass of the head
     "L1": 0.15,       # Natural length of spring between head and chest
-    "k1": 1000.0,     # Spring constant between head and chest
-    "c1": 300.0,      # Damping coefficient between head and chest
+    "k1": 500.0,     # Spring constant between head and chest
+    "c1": 800.0,      # Damping coefficient between head and chest
 
     # Seatbelt parameters (for nonlinear seatbelt force model)
-    "F_max": 1000.0,  # Maximum seatbelt force
-    "k_s": 250.0,     # Sigmoid slope
+    "F_max": 2000.0,  # Maximum seatbelt force
+    "k_s": 50.0,     # Sigmoid slope
     "L_slack1": 0.1,  # Slack length for the chest seatbelt (no force when displacement is within slack)
     "L_slack2": 0.1,  # Slack length for the abdomen seatbelt
-    "c_s": 50.0,      # Seatbelt damping coefficient
+    "c_s": 1000.0,      # Seatbelt damping coefficient
 
     # Seatbelt anchor points (fixed points); adjust to match desired seatbelt direction
     "x_anchor1": 0.01, "y_anchor1": 0.51,  # Anchor for chest belt
