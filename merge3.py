@@ -469,32 +469,122 @@ def velocity_acceleration_plots(time, sol):
 
 
 # ============= Functions for mass distribition ===================
+def calculating_spring_force(sol, params):
 
-def mass_distributions(t_max_sim, initial_conditions, params):
+    L0, L1, k, k1 = params["L0"], params["L1"], params["k"], params["k1"]
+
+    x1, y1 = sol[0], sol[2]
+    x2, y2 = sol[4], sol[6]
+    x3, y3 = sol[8], sol[10]
+
+    distance = np.sqrt((x1 - x2)**2 + (y1 - y2)**2)
+    extension = distance - L0
+    force = -k * extension
+
+    distance1 = np.sqrt((x3 - x1)**2 + (y3 - y1)**2)
+    extension1 = distance1 - L1
+    force1 = -k1 * extension1
+
+    return force, force1
+
+def center_of_mass(chest_masses, abdomen_masses, head_mass, total_mass, initial_conditions):
+    # Assuming chest, abdomen, and head have mass and position at the start
+    # Extract positions from init_conditions
+    x1, y1 = initial_conditions[0], initial_conditions[2]  # Chest position
+    x2, y2 = initial_conditions[4], initial_conditions[6]  # Abdomen position
+    x3, y3 = initial_conditions[8], initial_conditions[10]  # Head position
+
+    # Calculate weighted sum for x and y positions
+    x_com = (chest_masses * x1 + abdomen_masses * x2 + head_mass * x3) / total_mass
+    y_com = (chest_masses * y1 + abdomen_masses * y2 + head_mass * y3) / total_mass
+    
+    return x_com, y_com
+
+def mass_distributions(t_max_sim, initial_conditions, params, total_mass = 80):
 
     # assume mass of head is constant in the process
-    # range of masses between 10kg and 60kg
-    chest_masses = np.arange(10,61,10)
-    abdomen_masses = np.arange(10,61,10)
-
+    # range of masses, total masses assumed to be but can be varied with gender
+    # num steps to 20
+    num_points = 20
+    body_mass = total_mass - params["m3"]
+    lower_bound, upper_bound = round(0.25*body_mass), round(0.75*body_mass)+1
+    step = round((upper_bound- lower_bound) / num_points)
+    chest_masses = np.arange(lower_bound, upper_bound, step)
+    abdomen_masses = np.flip(chest_masses)
+    mass_ratio = chest_masses/ abdomen_masses
+    peak_list_torso = []
+    peak_list_neck = []
+    centre_of_mass_x, centre_of_mass_y = center_of_mass(chest_masses, abdomen_masses, params['m3'], total_mass, initial_conditions)
+    print(centre_of_mass_y)
     # iterating over mass combinations
-    for i in range(chest_masses):
-        for j in range(abdomen_masses):
+    for i in range(len(chest_masses)):
             
-            params["m1"] = i
-            params["m2"] = j
+        params["m1"] = chest_masses[i]
+        params["m2"] = abdomen_masses[i]
 
-            sol = solution(t_max_sim, initial_conditions, params)
+        t, sol = solution(t_max_sim, initial_conditions, params)
+        e_torso, e_neck = calculating_spring_force(sol, params)
+        peak_list_torso.append(max(e_torso))
+        peak_list_neck.append(max(e_neck))
 
+    neck_injury = 20 # change for critical value of force
+    torso_injury = 60
+    
+    # Create figure and two subplots
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 5))  # 1 row, 2 columns
 
+    # Plot in the first subplot (Torso Peak Force)
+    ax1.plot(mass_ratio, peak_list_torso, 'ro-', label='Peak Force In Torso', alpha=0.7)
+    ax1.axhline(torso_injury, color='grey', linestyle='--', linewidth=2, label='Critical Force For Serious Injury In Torso', alpha=0.7)
+    ax1.set_xlabel('Mass Ratio Between Chest and Abdomen (Chest Mass / Abdomen Mass)')
+    ax1.set_ylabel('Peak Force In Springs (N)')
+    ax1.set_title(f'Peak Force For Torso (Total Mass: {total_mass} kg)')
+    ax1.grid(True)
+    ax1.legend()
 
+    # Plot in the second subplot (Neck Peak Force)
+    ax2.plot(mass_ratio, peak_list_neck, 'bo-', label='Peak Force in Neck', alpha=0.7)
+    ax2.axhline(neck_injury, color='black', linestyle='--', linewidth=2, label='Critical Force For Serious Injury In Neck', alpha=0.7)
+    ax2.set_xlabel('Mass Ratio Between Chest and Abdomen (Chest Mass / Abdomen Mass)')
+    ax2.set_ylabel('Peak Force In Springs (N)')
+    ax2.set_title(f'Peak Force For Neck (Total Mass: {total_mass} kg)')
+    ax2.grid(True)
+    ax2.legend()
 
+    # Adjust layout for better spacing
+    plt.tight_layout()
 
+    # Show the plot
+    plt.show()
 
+    # Create figure and two subplots (1 row, 2 columns)
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 5))
 
+    # Plot Peak Force in Torso in the first subplot
+    ax1.plot(centre_of_mass_y, peak_list_torso, 'ro-', label='Peak Force In Torso', alpha=0.7)
+    ax1.axhline(torso_injury, color='grey', linestyle='--', linewidth=2, label='Critical Force For Serious Injury In Torso', alpha=0.7)
+    ax1.set_xlabel('Centre of Mass (y-direction) (m)')
+    ax1.set_ylabel('Peak Force In Springs (N)')
+    ax1.set_title(f'Peak Force For Torso (Total Mass: {total_mass} kg)')
+    ax1.grid(True)
+    ax1.legend()
 
+    # Plot Peak Force in Neck in the second subplot
+    ax2.plot(centre_of_mass_y, peak_list_neck, 'bo-', label='Peak Force in Neck', alpha=0.7)
+    ax2.axhline(neck_injury, color='black', linestyle='--', linewidth=2, label='Critical Force For Serious Injury In Neck', alpha=0.7)
+    ax2.set_xlabel('Centre of Mass (y-direction) (m)')
+    ax2.set_ylabel('Peak Force In Springs (N)')
+    ax2.set_title(f'Peak Force For Neck (Total Mass: {total_mass} kg)')
+    ax2.grid(True)
+    ax2.legend()
 
+    # Adjust layout for better spacing
+    plt.tight_layout()
 
+    # Show the plot
+    plt.show()
+        
+   
 
 
 
@@ -545,6 +635,8 @@ init_conditions = [x1_0, v1x_0, y1_0, v1y_0,
                     x2_0, v2x_0, y2_0, v2y_0, x3_0, v3x_0, y3_0, v3y_0]
 t_max_sim = 1
 
+
+
 # uncomment if you want base solution/ different plots
 # finds solution no bounce
 t, sol = solution(t_max_sim, init_conditions, parameters)
@@ -553,3 +645,6 @@ position_plot(sol)
 animation_plot(t, sol, parameters)
 spring_plots(t, sol, parameters)
 velocity_acceleration_plots(t,sol)
+
+
+mass_distributions(t_max_sim, init_conditions, parameters, total_mass= 80)
