@@ -27,15 +27,16 @@ def equations(t, Y, params):
     x1, v1x, y1, v1y, x2, v2x, y2, v2y, x3, v3x, y3, v3y = Y
 
     # Unpack parameters from the dictionary
-    m1, m2, k, c, g, L0, y_floor, restitution, k_floor, c_floor, m3, L1, k1, c1, \
+    m1, m2, k, c, g, L0, y_floor, restitution, k_seat, c_seat, m3, L1, k1, c1, \
     F_max, k_s, L_slack1, L_slack2, c_s, x_anchor1, y_anchor1, x_anchor2, y_anchor2, \
-    A, b, t_impulse, ratio_impulse = (
+    A, b, t_impulse, ratio_impulse, k_muscle, c_muscle = (
         params["m1"], params["m2"], params["k"], params["c"], params["g"], params["L0"],
-        params["y_floor"], params["restitution"], params["k_floor"], params["c_floor"],
+        params["y_floor"], params["restitution"], params["k_seat"], params["c_seat"],
         params["m3"], params["L1"], params["k1"], params["c1"], params["F_max"],
         params["k_s"], params["L_slack1"], params["L_slack2"], params["c_s"],
         params["x_anchor1"], params["y_anchor1"], params["x_anchor2"], params["y_anchor2"],
-        params["A"], params["b"], params["t_impulse"], params["ratio_impulse"]
+        params["A"], params["b"], params["t_impulse"], params["ratio_impulse"], 
+        params["k_muscle"], params["c_muscle"]
     )
 
     # Position derivatives
@@ -133,15 +134,25 @@ def equations(t, Y, params):
     dist_neck = np.sqrt(dx_neck**2 + dy_neck**2)
     if dist_neck == 0:
         dist_neck = 1e-9
-    F_spring_neck = -k1 * (dist_neck)
+    F_spring_neck = -k_muscle * (dist_neck)
     ux_neck, uy_neck = dx_neck/dist_neck, dy_neck/dist_neck
     F_spring_x_neck = F_spring_neck * ux_neck
     F_spring_y_neck= F_spring_neck * uy_neck
-    rel_vx_neck = v1x - v2x
-    rel_vy_neck = v1y - v2y
-    v_rel_neck = rel_vx_neck*ux + rel_vy_neck*uy
-    F_damp_x_neck = -c1 * v_rel_neck * ux_neck
-    F_damp_y_neck = -c1 * v_rel_neck * uy_neck
+
+    # Compute velocity of the ideal neck position
+    d_norm_dt = ((dx * (v3x - v1x) + dy * (v3y - v1y)) / dist)
+    dux_dt = ((v3x - v1x) * dist - dx * d_norm_dt) / (dist**2)
+    duy_dt = ((v3y - v1y) * dist - dy * d_norm_dt) / (dist**2)
+
+    v_neck_x = v1x + dux_dt * L1
+    v_neck_y = v1y + duy_dt * L1
+
+    # Compute relative velocity (head vs ideal neck point)
+    v_rel_x_neck = v3x - v_neck_x
+    v_rel_y_neck = v3y - v_neck_y
+    # Compute damping force
+    F_damp_x_neck = -c_muscle * v_rel_x_neck
+    F_damp_y_neck = -c_muscle * v_rel_y_neck
 
     # ---------- D. Impact Force (Gaussian Pulse) ----------
     # Main impulse along x-direction
@@ -152,30 +163,44 @@ def equations(t, Y, params):
     # Let the abdomen receive part of the impulse
     ratio_abdomen = ratio_impulse
 
-    # -----------floor collision ---------------------
+    # -----------Seat collision ---------------------
 
-    # Floor interaction (smooth force instead of bounce)
-    if y1 < y_floor:
-        F_floor_1 = -k_floor * (y1 - y_floor) - c_floor * v1x
+    # back rest interaction (smooth force instead of bounce)
+    if x1 < 0:
+        F_seat_1_x = -k_seat * (x1) - c_seat * v1x
     else:
-        F_floor_1 = 0
-    if y2 < y_floor:
-        F_floor_2 = -k_floor * (y2 - y_floor) - c_floor * v2y
+        F_seat_1_x = 0
+    if x2 < 0:
+        F_seat_2_x = -k_seat * (x2) - c_seat * v2x
     else:
-        F_floor_2 = 0
-    if y3 < y_floor:
-        F_floor_3 = -k_floor * (y3 - y_floor) - c_floor * v3y
+        F_seat_2_x = 0
+    if x3 < 0:
+        F_seat_3_x = -k_seat * (x3) - c_seat * v3x
     else:
-        F_floor_3 = 0
+        F_seat_3_x = 0
+
+    # seat Floor interaction (smooth force instead of bounce)
+    if y1 < 0:
+        F_seat_1_y = -k_seat * (y1) - c_seat* v1y
+    else:
+        F_seat_1_y = 0
+    if y2 < 0:
+        F_seat_2_y = -k_seat * (y2) - c_seat * v2y
+    else:
+        F_seat_2_y = 0
+    if y3 < 0:
+        F_seat_3_y = -k_seat * (y3) - c_seat * v3y
+    else:
+        F_seat_3_y = 0
         
 
     # ---------- E. Combine Forces -> Acceleration ----------
-    dv1x_dt = (F_spring_x - F_spring_xh + F_damp_x - F_damp_xh + F_s1x + impulse_x) / m1
-    dv1y_dt = (F_spring_y - F_spring_yh + F_damp_y - F_damp_yh + F_s1y + impulse_y + F_floor_1) / m1 -g
-    dv2x_dt = (-F_spring_x - F_damp_x + F_s2x + ratio_abdomen * impulse_x) / m2
-    dv2y_dt = (-F_spring_y - F_damp_y + F_s2y + ratio_abdomen * impulse_y + F_floor_2) / m2 -g
-    dv3x_dt = (F_spring_xh + F_damp_xh + F_spring_x_neck + F_damp_x_neck + impulse_x) / m3
-    dv3y_dt = (F_spring_yh + F_damp_yh + F_spring_y_neck + F_damp_y_neck + impulse_y + F_floor_3) / m3 -g
+    dv1x_dt = (F_spring_x - F_spring_xh + F_damp_x - F_damp_xh + F_s1x + impulse_x + F_seat_1_x) / m1
+    dv1y_dt = (F_spring_y - F_spring_yh + F_damp_y - F_damp_yh + F_s1y + impulse_y + F_seat_1_y) / m1 -g
+    dv2x_dt = (-F_spring_x - F_damp_x + F_s2x + ratio_abdomen * impulse_x + F_seat_2_x) / m2
+    dv2y_dt = (-F_spring_y - F_damp_y + F_s2y + ratio_abdomen * impulse_y + F_seat_2_y) / m2 -g
+    dv3x_dt = (F_spring_xh + F_damp_xh + F_spring_x_neck + F_damp_x_neck + impulse_x + F_seat_3_x) / m3
+    dv3y_dt = (F_spring_yh + F_damp_yh + F_spring_y_neck + F_damp_y_neck + impulse_y + F_seat_3_y) / m3 -g
 
     return [dx1_dt, dv1x_dt, dy1_dt, dv1y_dt,
             dx2_dt, dv2x_dt, dy2_dt, dv2y_dt,dx3_dt, dv3x_dt, dy3_dt, dv3y_dt]
@@ -194,13 +219,13 @@ def solution(t_max, ini_conditions, parameters):
 
 # =============== 4. Multi-phase Integration (With Floor Collisions) ===============
 def floor_collision_m1(t, Y):
-    return Y[2] - y_floor  # Detect when chest (y1) hits the floor
+    return Y[2] - parameters["y_floor"] # Detect when chest (y1) hits the floor
 
 def floor_collision_m2(t, Y):
-    return Y[6] - y_floor  # Detect when abdomen (y2) hits the floor
+    return Y[6] - parameters["y_floor"]  # Detect when abdomen (y2) hits the floor
 
 def floor_collision_m3(t, Y):
-    return Y[8] - y_floor  # Detect when head (y3) hits the floor
+    return Y[8] - parameters["y_floor"]  # Detect when head (y3) hits the floor
 
 
 floor_collision_m1.terminal = True
@@ -225,11 +250,11 @@ def solve_with_bounces(t_max, init_conditions):
         Y_collision = sol.y[:, -1]
         # Handle collisions: reverse vertical velocities upon impact
         if len(sol.t_events[0]) > 0:
-            Y_collision[3] *= -restitution
+            Y_collision[3] *= -parameters["restitution"]
         if len(sol.t_events[1]) > 0:
-            Y_collision[7] *= -restitution
+            Y_collision[7] *= -parameters["restitution"]
         if len(sol.t_events[2]) > 0:
-            Y_collision[11] *= -restitution
+            Y_collision[11] *= -parameters["restitution"]
         t0 = sol.t[-1] + 1e-3
         conditions = Y_collision
     t_full = np.concatenate(t_all)
@@ -246,6 +271,9 @@ def position_plot(sol):
     plt.plot(x1, y1, 'b-', label='Chest (m1)')
     plt.plot(x2, y2, 'r-', label='Abdomen (m2)')
     plt.plot(x3, y3, 'g', label = 'Head')
+    # Add dashed lines at x = 0 and y = 0 to indicate seat
+    plt.axhline(0, color='k', linestyle='--', label='Seat Floor')  # Dashed line for y = 0 (seat level)
+    plt.axvline(0, color='k', linestyle='--', label='Seat Backing')  # Dashed line for x = 0 (seat level)
     plt.xlabel('X Position (m)')
     plt.ylabel('Y Position (m)')
     plt.title('Initial Trajectory (No Bounces)')
@@ -278,7 +306,8 @@ def animation_plot(time, sol, params):
     ax.set_ylabel('Y Position (m)')
     ax.set_title('Spring-Damper Motion with Seatbelts (Nonlinear Forces & Impulse)')
     ax.grid()
-    ax.axhline(y_floor, color='black', linestyle='--', linewidth=2, label='Floor')
+    ax.axhline(y_floor, color='black', linestyle='--', linewidth=2, label='Seat Floor')
+    ax.axvline(y_floor, color='black', linestyle='--', linewidth=2, label='Seat Backing')
 
     line1, = ax.plot([], [], 'bo-', markersize=8, label='Chest (m1)')
     line2, = ax.plot([], [], 'go-', markersize=8, label='Abdomen (m2)')
@@ -482,14 +511,16 @@ parameters = {
     "L0": 0.5,        # Natural spring length
     "y_floor": 0.0,   # Floor height
     "restitution": 0.0, # Energy loss factor upon collision (1 = perfect bounce, <1 = energy loss)
-    "k_floor": 1e6,   # Floor spring constant
-    "c_floor": 250,   # Floor damping coefficient
+    "k_seat": 2e4,   # seat floor spring constant
+    "c_seat": 2500,   # Floor damping coefficient
 
     # Adding parameters for the head mass
     "m3": 4.5,        # Mass of the head
     "L1": 0.15,       # Natural length of spring between head and chest
-    "k1": 500.0,     # Spring constant between head and chest
-    "c1": 800.0,      # Damping coefficient between head and chest
+    "k1": 800.0,     # Spring constant between head and chest
+    "c1": 500.0,      # Damping coefficient between head and chest
+    "k_muscle": 2000, # Spring constant for muscle in neck
+    "c_muscle": 100, # Damping coefficient for muscle in neck
 
     # Seatbelt parameters (for nonlinear seatbelt force model)
     "F_max": 2000.0,  # Maximum seatbelt force
