@@ -2,6 +2,9 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 from scipy.integrate import solve_ivp
+from scipy.integrate import cumulative_trapezoid
+import pandas as pd
+from itertools import product
 
 # =============== 1. Initial condition setting ===============
 
@@ -21,7 +24,7 @@ v3x_0, v3y_0 = 0.0, 0.0  # Velocity
 # =============== 2. Define the Differential Equations ===============
 def equations(t, Y, params):
     """
-    Y = [x1, v1x, y1, v1y, x2, v2x, y2, v2y]
+    Y = [x1, v1x, y1, v1y, x2, v2x, y2, v2y, x3, v3x, y3, v3y]
     Returns dY/dt.
     """
     x1, v1x, y1, v1y, x2, v2x, y2, v2y, x3, v3x, y3, v3y = Y
@@ -92,7 +95,7 @@ def equations(t, Y, params):
         e1 = d1 - L_slack1  # Excess displacement
         # Force direction: from chest towards the anchor
         ux1, uy1 = -dx1_anchor/d1, -dy1_anchor/d1
-        F_seatbelt1 = F_max * sigmoid(e1, k_s, 0.0)
+        F_seatbelt1 = F_max * sigmoid(e1, k_s, L_slack1)
         v_rel1 = v1x*ux1 + v1y*uy1
         F_damp1 = -c_s * v_rel1
         F_s1_total = F_seatbelt1 + F_damp1
@@ -112,7 +115,7 @@ def equations(t, Y, params):
     if d2 > L_slack2:
         e2 = d2 - L_slack2
         ux2, uy2 = -dx2_anchor/d2, -dy2_anchor/d2
-        F_seatbelt2 = F_max * sigmoid(e2, k_s, 0.0)
+        F_seatbelt2 = F_max * sigmoid(e2, k_s, L_slack2)
         v_rel2 = v2x*ux2 + v2y*uy2
         F_damp2 = -c_s * v_rel2
         F_s2_total = F_seatbelt2 + F_damp2
@@ -196,9 +199,9 @@ def equations(t, Y, params):
 
     # ---------- E. Combine Forces -> Acceleration ----------
     dv1x_dt = (F_spring_x - F_spring_xh + F_damp_x - F_damp_xh + F_s1x + impulse_x + F_seat_1_x) / m1
-    dv1y_dt = (F_spring_y - F_spring_yh + F_damp_y - F_damp_yh + F_s1y + impulse_y + F_seat_1_y) / m1 -g
-    dv2x_dt = (-F_spring_x - F_damp_x + F_s2x + ratio_abdomen * impulse_x + F_seat_2_x) / m2
-    dv2y_dt = (-F_spring_y - F_damp_y + F_s2y + ratio_abdomen * impulse_y + F_seat_2_y) / m2 -g
+    dv1y_dt = (F_spring_y - F_spring_yh + F_damp_y - F_damp_yh + F_s1y + impulse_y + F_seat_1_y ) / m1 -g
+    dv2x_dt = (-F_spring_x - F_damp_x + F_s2x + impulse_x + F_seat_2_x) / m2
+    dv2y_dt = (-F_spring_y - F_damp_y + F_s2y + impulse_y + F_seat_2_y) / m2 -g
     dv3x_dt = (F_spring_xh + F_damp_xh + F_spring_x_neck + F_damp_x_neck + impulse_x + F_seat_3_x) / m3
     dv3y_dt = (F_spring_yh + F_damp_yh + F_spring_y_neck + F_damp_y_neck + impulse_y + F_seat_3_y) / m3 -g
 
@@ -314,6 +317,8 @@ def animation_plot(time, sol, params):
     line3, = ax.plot([], [], 'ro-', markersize=8, label='Head (m3)')
     spring, = ax.plot([], [], 'r-', linewidth=2, label='Spring')
     spring2, = ax.plot([], [], 'g-', linewidth=2, label='Head-Chest')
+    spring3, = ax.plot([], [], 'k-', linewidth=2, label='Chest restraint')
+    spring4, = ax.plot([], [], 'k-', linewidth=2, label='Abdomen restraint')
 
     def init():
         line1.set_data([], [])
@@ -321,7 +326,9 @@ def animation_plot(time, sol, params):
         line3.set_data([], [])
         spring.set_data([], [])
         spring2.set_data([], [])
-        return line1, line2, line3, spring, spring2
+        spring3.set_data([], [])
+        spring4.set_data([], [])
+        return line1, line2, line3, spring, spring2, spring3, spring4
 
 
     def update(frame):
@@ -330,7 +337,9 @@ def animation_plot(time, sol, params):
         line3.set_data([x3[frame]], [y3[frame]])
         spring.set_data([x1[frame], x2[frame]], [y1[frame], y2[frame]])
         spring2.set_data([x3[frame], x1[frame]], [y3[frame], y1[frame]])
-        return line1, line2, spring, line3, spring2
+        spring3.set_data([params['x_anchor1'], x1[frame]], [params['y_anchor1'], y1[frame]])
+        spring4.set_data([params['x_anchor2'], x2[frame]], [params['y_anchor2'], y2[frame]])
+        return line1, line2, spring, line3, spring2,spring3,spring4
 
     ani = animation.FuncAnimation(fig, update, frames=len(time), init_func=init,
                                 blit=True, interval=20)
@@ -487,6 +496,61 @@ def calculating_spring_force(sol, params):
 
     return force, force1
 
+def seatbelt_force(sol, params):
+
+
+    x1, y1 = sol[0], sol[2]
+    x2, y2 = sol[4], sol[6]
+    x3, y3 = sol[8], sol[10]
+
+    dx1_anchor = x1 - params["x_anchor1"]
+    dy1_anchor = y1 - params["y_anchor1"]
+    d1 = np.sqrt(dx1_anchor**2 + dy1_anchor**2)
+    f_seatbelt1 = []
+    for index, distance1 in enumerate(d1):
+        # Generate force only if displacement exceeds slack length
+        if distance1 > params["L_slack1"]:
+            e1 = distance1 - params["L_slack1"]  # Excess displacement
+            # Force direction: from chest towards the anchor
+            F1 = params["F_max"] * sigmoid(e1, params["k_s"],params["L_slack1"])
+            f_seatbelt1.append(F1)
+        else:
+            f_seatbelt1.append(0)
+
+    # ---------- C. Seatbelt Force: Abdomen Belt (Pull-only) ----------
+    dx2_anchor = x2 - params["x_anchor2"]
+    dy2_anchor = y2 - params["y_anchor2"]
+    d2 = np.sqrt(dx2_anchor**2 + dy2_anchor**2)
+    f_seatbelt2 = []
+    for index, distance2 in enumerate(d2):
+        # Generate force only if displacement exceeds slack length
+        if distance2 > params["L_slack2"]:
+            e2 = distance2 - params["L_slack2"]  # Excess displacement
+            # Force direction: from chest towards the anchor
+            F2 = params["F_max"] * sigmoid(e2, params["k_s"], params["L_slack2"])
+            f_seatbelt2.append(F2)
+        else:
+            f_seatbelt2.append(0)
+
+    return f_seatbelt1, f_seatbelt2
+
+
+def plotting_seatbelt_forces(time, sol, params):
+
+    f_seatbelt_1, f_seatbelt_2 = seatbelt_force(sol, params)
+
+    plt.figure(figsize=(8,5))
+    plt.plot(time, f_seatbelt_1, label = 'Force From Chest Seatbelt')
+    plt.plot(time, f_seatbelt_2, label= 'Force From Abdomen Seatbelt')
+    plt.grid()
+    plt.legend()
+    plt.xlabel('Time (s)')
+    plt.ylabel('Force (N)')
+    plt.title('Force Form Seatbelts During Collision')
+    plt.show()
+
+    
+
 def center_of_mass(chest_masses, abdomen_masses, head_mass, total_mass, initial_conditions):
     # Assuming chest, abdomen, and head have mass and position at the start
     # Extract positions from init_conditions
@@ -507,15 +571,13 @@ def mass_distributions(t_max_sim, initial_conditions, params, total_mass = 80):
     # num steps to 20
     num_points = 20
     body_mass = total_mass - params["m3"]
-    lower_bound, upper_bound = round(0.25*body_mass), round(0.75*body_mass)+1
-    step = round((upper_bound- lower_bound) / num_points)
-    chest_masses = np.arange(lower_bound, upper_bound, step)
+    lower_bound, upper_bound = round(body_mass/3), round((2*body_mass)/3)+1
+    chest_masses = np.linespace(lower_bound, upper_bound, num_points)
     abdomen_masses = np.flip(chest_masses)
     mass_ratio = chest_masses/ abdomen_masses
     peak_list_torso = []
     peak_list_neck = []
     centre_of_mass_x, centre_of_mass_y = center_of_mass(chest_masses, abdomen_masses, params['m3'], total_mass, initial_conditions)
-    print(centre_of_mass_y)
     # iterating over mass combinations
     for i in range(len(chest_masses)):
             
@@ -585,8 +647,392 @@ def mass_distributions(t_max_sim, initial_conditions, params, total_mass = 80):
     plt.show()
         
    
+# ============== Pregnacy simulation ============================
+
+def pregnancy_simulation(t_max_sim, initial_conditions, params):
+
+    # female simulation without pregancy
+    # finds solution no bounce
+    t, sol = solution(t_max_sim, initial_conditions, params)
+
+    f_seatbelt_1_w, f_seatbelt_2_w = seatbelt_force(sol, params)
+
+    f_torso_w, f_neck_w = calculating_spring_force(sol, params)
 
 
+    # change in parameters for pregnancy 
+    params['m2'] = 10 + params['m2']  # extra 10 kg for pregnancy
+    initial_conditions[4] += 0.15
+    """ params['L_slack1'] = 0.1
+    params['L_slack2'] += 0.15"""
+
+    # finds solution no bounce
+    t, sol = solution(t_max_sim, initial_conditions, params)
+    # plots
+    f_seatbelt_1_p, f_seatbelt_2_p = seatbelt_force(sol, params)
+
+    f_torso_p, f_neck_p = calculating_spring_force(sol, params)
+
+    plt.figure(figsize=(8,5))
+    plt.subplot(1,2,1)
+    plt.plot(t, f_seatbelt_1_w, label = 'Force From Chest Seatbelt')
+    plt.plot(t, f_seatbelt_2_w, label= 'Force From Abdomen Seatbelt')
+    plt.grid()
+    plt.legend()
+    plt.xlabel('Time (s)')
+    plt.ylabel('Force (N)')
+    plt.title('Woman: Force Form Seatbelts During Collision')
+
+    plt.subplot(1,2,2)
+    plt.plot(t, f_seatbelt_1_p, label = 'Force From Chest Seatbelt')
+    plt.plot(t, f_seatbelt_2_p, label= 'Force From Abdomen Seatbelt')
+    plt.grid()
+    plt.legend()
+    plt.xlabel('Time (s)')
+    plt.ylabel('Force (N)')
+    plt.title('Pregnancy: Force Form Seatbelts During Collision')
+
+    plt.tight_layout()
+    plt.show()
+    
+
+
+    # plotting forces in body 
+
+    plt.subplot(1, 2, 1)
+    plt.plot(t, f_torso_w, label="Not Pregnant")
+    plt.axhline(0, color='k', linestyle='--')
+    plt.xlabel('Time (s)')
+    plt.ylabel('Force (N)')
+    plt.title('Spring Force In Torso Pregancy Comarison')
+    plt.legend()
+    plt.grid()
+
+    plt.subplot(1, 2, 2)
+    plt.plot(t, f_neck_w, label="Not Pregnant")
+    plt.axhline(0, color='k', linestyle='--')
+    plt.xlabel('Time (s)')
+    plt.ylabel('Force (N)')
+    plt.title('Spring Force In Neck Over Time Pregnancy Comparison')
+    plt.legend()
+    plt.grid()
+
+    plt.subplot(1, 2, 1)
+    plt.plot(t, f_torso_p, label="Pregnant")
+    plt.legend()
+    plt.grid()
+
+    plt.subplot(1, 2, 2)
+    plt.plot(t, f_neck_p, label="Pregnant")
+    plt.legend()
+    plt.grid()
+
+    plt.tight_layout()
+    plt.show()
+
+
+    """ position_plot(sol)
+    animation_plot(t, sol, params)
+    spring_plots(t,sol,params)
+    plotting_seatbelt_forces(t,sol,parameters)
+    velocity_acceleration_plots(t,sol)"""
+
+
+
+
+
+# ============== Effect of increasing crash forces =============
+
+def crash_force(t_max_sim, initial_conditions, params):
+
+    mass = params['m1'] + params['m2'] + params["m3"]
+    force = np.linspace(500, 5000, 10)
+    
+    max_torso_force, max_neck_force, max_chest_seat_force, max_abdomen_seat_force = [],[],[],[]
+    av_torso_force, av_neck_force, av_chest_seat_force, av_abdomen_seat_force = [],[],[],[]
+    for f in force:
+        params["A"] = f
+        time, sol = solution(t_max_sim, initial_conditions, params)
+        torso_force, neck_force = calculating_spring_force(sol, params)
+        chest_seat_force, abdomen_seat_force = seatbelt_force(sol, params)
+        max_torso_force.append(max(np.abs(torso_force)))
+        max_neck_force.append(max(np.abs(neck_force)))
+        max_chest_seat_force.append(max(np.abs(chest_seat_force)))
+        max_abdomen_seat_force.append(max(np.abs(abdomen_seat_force)))
+        av_torso_force.append(np.mean(np.array(torso_force)))
+        av_neck_force.append(np.mean(np.array(neck_force)))
+        av_chest_seat_force.append(np.mean(np.array(chest_seat_force)))
+        av_abdomen_seat_force.append(np.mean(np.array(abdomen_seat_force)))
+
+
+    plt.figure()
+
+    plt.subplot(2,1,1)
+    plt.plot(force, max_torso_force, label = 'Peak Force In Torso')
+    plt.plot(force, max_neck_force, label = 'Peak Force In Neck')
+    plt.plot(force, av_torso_force, label = 'Peak Force In Torso' )
+    plt.plot(force, av_neck_force, label = 'Average Force In Neck')
+    plt.xlabel('Peak Crash Force (N)')
+    plt.ylabel('Force In Limbs (N)')
+    plt.title('Forces In Limbs Varying Peak Crash Force')
+    plt.grid()
+    plt.legend()
+
+    plt.subplot(2,1,2)
+    plt.plot(force, max_chest_seat_force, label = 'Peak Force In Chest Seatbelt')
+    plt.plot(force, max_abdomen_seat_force, label = 'Peak Force In Abdomen Seatbelt')
+    plt.plot(force, av_chest_seat_force, label ='Average Force In Chest Seatbelt')
+    plt.plot(force, av_abdomen_seat_force, label= 'Average Force In Abdomen Seatbelt')
+    plt.xlabel('Peak Crash Force (N)')
+    plt.ylabel('Force In Seatbelts (N)')
+    plt.title('Forces In Seatbelts Varying Peak Crash Force')
+    plt.grid()
+    plt.legend()
+
+    plt.tight_layout()
+    plt.show()
+
+    params["A"] = 1500
+    width = np.linspace(100, 1000, 10)
+    max_torso_force, max_neck_force, max_chest_seat_force, max_abdomen_seat_force = [],[],[],[]
+    av_torso_force, av_neck_force, av_chest_seat_force, av_abdomen_seat_force = [],[],[],[]
+    for w in width:
+        params["b"] = w
+        time, sol = solution(t_max_sim, initial_conditions, params)
+        torso_force, neck_force = calculating_spring_force(sol, params)
+        chest_seat_force, abdomen_seat_force = seatbelt_force(sol, params)
+        max_torso_force.append(max(np.abs(torso_force)))
+        max_neck_force.append(max(np.abs(neck_force)))
+        max_chest_seat_force.append(max(np.abs(chest_seat_force)))
+        max_abdomen_seat_force.append(max(abdomen_seat_force))
+        av_torso_force.append(np.mean(np.array(torso_force)))
+        av_neck_force.append(np.mean(np.array(neck_force)))
+        av_chest_seat_force.append(np.mean(np.array(chest_seat_force)))
+        av_abdomen_seat_force.append(np.mean(np.array(abdomen_seat_force)))
+
+    plt.figure()
+    plt.subplot(2,1,1)
+    plt.plot(force, max_torso_force, label = 'Peak Force In Torso')
+    plt.plot(force, max_neck_force, label = 'Peak Force In Neck')
+    plt.plot(force, av_torso_force, label = 'Peak Force In Torso' )
+    plt.plot(force, av_neck_force, label = 'Average Force In Neck')
+    plt.xlabel('Peak Crash Force (N)')
+    plt.ylabel('Force In Limbs (N)')
+    plt.title('Forces In Limbs Varying Width of Crash Force Pulse')
+    plt.grid()
+    plt.legend()
+
+    plt.subplot(2,1,2)
+    plt.plot(width, max_chest_seat_force, label = 'Peak Force In Chest Seatbelt')
+    plt.plot(width, max_abdomen_seat_force, label = 'Peak Force In Abdomen Seatbelt')
+    plt.plot(width, av_chest_seat_force, label = 'Average Force In Chest Seatbelt')
+    plt.plot(width, av_abdomen_seat_force, label = 'Average Force In Abdomen Seatbelt')
+    plt.xlabel('Width of Crash Force (s-1)')
+    plt.ylabel('Force In Seatbelts (N)')
+    plt.title('Forces In Seatbelts Varying Width of Crash Force Pulse')
+    plt.grid()
+    plt.legend()
+
+
+    plt.tight_layout()
+    plt.show()
+
+
+# ============== Question 4: compute_injury_metrics ===========================
+def compute_HIC(t, a):
+    # Convert acceleration units from m/s² to g
+    a_g = a / 9.81
+    dt_max = 0.036  # 36 ms
+
+    # 累计积分
+    cum_int = np.concatenate(([0], cumulative_trapezoid(a_g, t)))
+    n = len(t)
+    hic_value = 0.0
+
+    for i in range(n - 1):
+        for j in range(i + 1, n):
+            if t[j] - t[i] > dt_max:
+                break
+            dt_ij = t[j] - t[i]
+            area_ij = cum_int[j] - cum_int[i]
+            a_avg = area_ij / dt_ij  # Average acceleration in g
+            hic_ij = (a_avg ** 2.5) * dt_ij
+            if hic_ij > hic_value:
+                hic_value = hic_ij
+
+    return hic_value
+
+def compute_injury_metrics(sol, t, params):
+    """
+    Extract key injury metrics:
+    1. HIC (based on head resultant acceleration)
+    2. Peak force generated by the chest-abdomen spring
+    """
+    # -- Head resultant acceleration --
+    v3x = sol[9]   # Head x-velocity
+    v3y = sol[11]  # Head y-velocity
+    a3x = np.gradient(v3x, t)
+    a3y = np.gradient(v3y, t)
+    # 2D resultant acceleration
+    a_head = np.sqrt(a3x**2 + a3y**2)
+    # Calculate HIC
+    hic_value = compute_HIC(t, a_head)
+
+    # -- Peak force of the chest-abdomen spring --
+    x1, y1 = sol[0], sol[2]  # Chest
+    x2, y2 = sol[4], sol[6]  # Abdomen
+    dist = np.sqrt((x1 - x2)**2 + (y1 - y2)**2)
+    extension = dist - params["L0"]
+    force_torso = np.abs(params["k"] * extension)
+    peak_torso_force = np.max(force_torso)
+
+    return {
+        "HIC": hic_value,
+        "peak_torso_force": peak_torso_force
+    }
+
+
+# =============== Calculate seatbelt force ===============
+def calculating_seatbelt_force(sol, params):
+    """
+    返回在每个时刻，胸部安全带 (seatbelt1) 和腹部安全带 (seatbelt2) 的力（绝对值）。
+    """
+    x1, y1, v1x, v1y = sol[0], sol[2], sol[1], sol[3]
+    x2, y2, v2x, v2y = sol[4], sol[6], sol[5], sol[7]
+
+    x_anchor1, y_anchor1 = params["x_anchor1"], params["y_anchor1"]
+    x_anchor2, y_anchor2 = params["x_anchor2"], params["y_anchor2"]
+    L_slack1, L_slack2 = params["L_slack1"], params["L_slack2"]
+    F_max, k_s, c_s = params["F_max"], params["k_s"], params["c_s"]
+
+    # Chest Belt
+    d1 = np.sqrt((x1 - x_anchor1)**2 + (y1 - y_anchor1)**2)
+    seatbelt_chest = np.zeros_like(d1)
+    condition = d1 > L_slack1
+    if np.any(condition):
+        e1 = d1[condition] - L_slack1
+        ux1 = -(x1[condition] - x_anchor1) / d1[condition]
+        uy1 = -(y1[condition] - y_anchor1) / d1[condition]
+        F_val1 = F_max * sigmoid(e1, k_s, 0.0)
+        v_rel1 = v1x[condition]*ux1 + v1y[condition]*uy1
+        F_damp1 = -c_s * v_rel1
+        F_total1 = F_val1 + F_damp1
+        F_total1[F_total1 < 0] = 0
+        seatbelt_chest[condition] = np.abs(F_total1)
+
+    # Abdomen Belt
+    d2 = np.sqrt((x2 - x_anchor2)**2 + (y2 - y_anchor2)**2)
+    seatbelt_abd = np.zeros_like(d2)
+    condition2 = d2 > L_slack2
+    if np.any(condition2):
+        e2 = d2[condition2] - L_slack2
+        ux2 = -(x2[condition2] - x_anchor2) / d2[condition2]
+        uy2 = -(y2[condition2] - y_anchor2) / d2[condition2]
+        F_val2 = F_max * sigmoid(e2, k_s, 0.0)
+        v_rel2 = v2x[condition2]*ux2 + v2y[condition2]*uy2
+        F_damp2 = -c_s * v_rel2
+        F_total2 = F_val2 + F_damp2
+        F_total2[F_total2 < 0] = 0
+        seatbelt_abd[condition2] = np.abs(F_total2)
+
+    return seatbelt_chest, seatbelt_abd
+
+def sweep_spring_forces(t_max_sim, init_conditions, params,
+                        L0_values, L1_values):
+
+    original_L0 = params["L0"]
+    original_L1 = params["L1"]
+
+    peak_torso_vs_L0 = []
+    peak_neck_vs_L1 = []
+
+    for val_L0 in L0_values:
+        params["L0"] = val_L0
+        params["L1"] = original_L1
+        t, sol = solution(t_max_sim, init_conditions, params)
+        force_torso, force_neck = calculating_spring_force(sol, params)
+        peak_torso_vs_L0.append(np.max(np.abs(force_torso)))
+
+    params["L0"] = original_L0
+    for val_L1 in L1_values:
+        params["L1"] = val_L1
+        t, sol = solution(t_max_sim, init_conditions, params)
+        force_torso, force_neck = calculating_spring_force(sol, params)
+        peak_neck_vs_L1.append(np.max(np.abs(force_neck)))
+
+    params["L0"] = original_L0
+    params["L1"] = original_L1
+
+    # 绘图
+    fig, axes = plt.subplots(1, 2, figsize=(12, 5))
+
+    # Torso Force vs L0
+    axes[0].plot(L0_values, peak_torso_vs_L0, 'ro-', label='Peak Torso Spring Force')
+    axes[0].set_xlabel('L0 (Chest-Abdomen Distance) [m]')
+    axes[0].set_ylabel('Peak Force [N]')
+    axes[0].set_title('Torso Spring Force vs. L0')
+    axes[0].grid(True)
+    axes[0].legend()
+
+    # Neck Force vs L1
+    axes[1].plot(L1_values, peak_neck_vs_L1, 'bo-', label='Peak Neck Spring Force')
+    axes[1].set_xlabel('L1 (Head-Chest Distance) [m]')
+    axes[1].set_ylabel('Peak Force [N]')
+    axes[1].set_title('Neck Spring Force vs. L1')
+    axes[1].grid(True)
+    axes[1].legend()
+
+    plt.tight_layout()
+    plt.show()
+
+
+def sweep_seatbelt_forces(t_max_sim, init_conditions, params,
+                          L0_values, L1_values):
+    original_L0 = params["L0"]
+    original_L1 = params["L1"]
+
+    peak_abdomen_belt_vs_L0 = []
+    peak_chest_belt_vs_L1 = []
+
+    # 1) Scan L0 (Recording Abdominal Harness Force)
+    for val_L0 in L0_values:
+        params["L0"] = val_L0
+        params["L1"] = original_L1
+        t, sol = solution(t_max_sim, init_conditions, params)
+        sb_chest, sb_abd = calculating_seatbelt_force(sol, params)
+        peak_abdomen_belt_vs_L0.append(np.max(sb_abd))
+
+    # 2) Scan L1 (record chest harness force)
+    params["L0"] = original_L0
+    for val_L1 in L1_values:
+        params["L1"] = val_L1
+        t, sol = solution(t_max_sim, init_conditions, params)
+        sb_chest, sb_abd = calculating_seatbelt_force(sol, params)
+        peak_chest_belt_vs_L1.append(np.max(sb_chest))
+
+    params["L0"] = original_L0
+    params["L1"] = original_L1
+
+    fig, axes = plt.subplots(1, 2, figsize=(12, 5))
+
+    # Abdomen Seatbelt Force vs L0
+    axes[0].plot(L0_values, peak_abdomen_belt_vs_L0, 'go-', label='Peak Abdomen Seatbelt Force')
+    axes[0].set_xlabel('L0 (Chest-Abdomen Distance) [m]')
+    axes[0].set_ylabel('Peak Force [N]')
+    axes[0].set_title('Abdomen Seatbelt Force vs. L0')
+    axes[0].grid(True)
+    axes[0].legend()
+
+    # Chest Seatbelt Force vs L1
+    axes[1].plot(L1_values, peak_chest_belt_vs_L1, 'mo-', label='Peak Chest Seatbelt Force')
+    axes[1].set_xlabel('L1 (Head-Chest Distance) [m]')
+    axes[1].set_ylabel('Peak Force [N]')
+    axes[1].set_title('Chest Seatbelt Force vs. L1')
+    axes[1].grid(True)
+    axes[1].legend()
+
+    plt.tight_layout()
+    plt.show()
 
 
 # ============== Solving and plotting ===========================
@@ -602,7 +1048,7 @@ parameters = {
     "y_floor": 0.0,   # Floor height
     "restitution": 0.0, # Energy loss factor upon collision (1 = perfect bounce, <1 = energy loss)
     "k_seat": 2e4,   # seat floor spring constant
-    "c_seat": 2500,   # Floor damping coefficient
+    "c_seat": 250,   # Floor damping coefficient
 
     # Adding parameters for the head mass
     "m3": 4.5,        # Mass of the head
@@ -624,27 +1070,90 @@ parameters = {
     "x_anchor2": 0.01, "y_anchor2": 0.01,  # Anchor for abdomen belt
 
     # Impact (impulse) parameters (Gaussian pulse)
-    "A": 800.0,       # Peak impulse force
+    "A": 1500.0,       # Peak impulse force
     "b": 500.0,       # Width control for Gaussian pulse
     "t_impulse": 0.04, # Time at which impulse is centered (sec)
     "ratio_impulse": 0.3,  # Ratio of impulse force's y-component to x-component
 }
 
-# setting initial conditions and time
-init_conditions = [x1_0, v1x_0, y1_0, v1y_0,
-                    x2_0, v2x_0, y2_0, v2y_0, x3_0, v3x_0, y3_0, v3y_0]
-t_max_sim = 1
+
+# ===============  main function  ==========================
+if __name__ == "__main__":
+    # setting initial conditions and time
+    init_conditions = [
+        x1_0, v1x_0, y1_0, v1y_0,
+        x2_0, v2x_0, y2_0, v2y_0,
+        x3_0, v3x_0, y3_0, v3y_0
+    ]
+    t_max_sim = 1
+
+    parameters = {
+        # Physical parameters
+        "m1": 19.5,  # Mass of the upper ball (chest)
+        "m2": 21.7,  # Mass of the lower ball (abdomen)
+        "k": 650.0,  # Spring constant (connecting chest and abdomen)
+        "c": 500.0,  # Spring damping coefficient (using original formulation)
+        "g": 9.81,   # Gravitational acceleration
+        "L0": 0.5,   # Natural spring length
+        "y_floor": 0.0,      # Floor height
+        "restitution": 0.0,  # Energy loss factor upon collision
+        "k_seat": 2e4,       # seat floor spring constant
+        "c_seat": 2500,      # Floor damping coefficient
+
+        # Head mass and spring
+        "m3": 4.5,
+        "L1": 0.15,
+        "k1": 800.0,
+        "c1": 500.0,
+        "k_muscle": 2000,
+        "c_muscle": 100,
+
+        # Seatbelt parameters
+        "F_max": 2000.0,
+        "k_s": 50.0,
+        "L_slack1": 0.1,
+        "L_slack2": 0.1,
+        "c_s": 1000.0,
+        "x_anchor1": 0.01, "y_anchor1": 0.51,
+        "x_anchor2": 0.01, "y_anchor2": 0.01,
+
+        # Impact (Gaussian pulse)
+        "A": 800.0,
+        "b": 500.0,
+        "t_impulse": 0.04,
+        "ratio_impulse": 0.3,
+    }
+
+    t, sol = solution(t_max_sim, init_conditions, parameters)
+    position_plot(sol)
+    animation_plot(t, sol, parameters)
+    # Spring force over time
+    spring_plots(t, sol, parameters)
+    # Velocity acceleration diagram
+    velocity_acceleration_plots(t, sol)
+    # Plots Seatbelt Forces
+    plotting_seatbelt_forces(t,sol,parameters)
+    # Mass distribution scans
+    mass_distributions(t_max_sim, init_conditions, parameters, total_mass=80)
+    # Pregnancy simulation
+    pregnancy_simulation(t_max_sim, init_conditions, parameters)
+    # Varying peak focre in crash and width of gaussian pulse
+    crash_force(t_max_sim, init_conditions, parameters)
+
+    # 3) Calculate the damage metric
+    injury_metrics = compute_injury_metrics(sol, t, parameters)
+    print("HIC:", injury_metrics["HIC"])
+    print("Torso Peak Force:", injury_metrics["peak_torso_force"])
+
+    L0_values = np.linspace(0.5, 0.9, 20)
+    L1_values = np.linspace(0.15, 0.30, 20)
+
+    # Torso and neck spring force peaks
+    sweep_spring_forces(t_max_sim, init_conditions, parameters,
+                        L0_values, L1_values)
+
+    # Peak harness force in the abdomen and chest
+    sweep_seatbelt_forces(t_max_sim, init_conditions, parameters,
+                          L0_values, L1_values)
 
 
-
-# uncomment if you want base solution/ different plots
-# finds solution no bounce
-t, sol = solution(t_max_sim, init_conditions, parameters)
-# plots
-position_plot(sol)
-animation_plot(t, sol, parameters)
-spring_plots(t, sol, parameters)
-velocity_acceleration_plots(t,sol)
-
-
-mass_distributions(t_max_sim, init_conditions, parameters, total_mass= 80)
